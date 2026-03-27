@@ -59,7 +59,7 @@ export default function InteractiveMap({ points, mode, threshold }: Props) {
     points.forEach((pt) => {
       let color: string;
 
-      if (mode === "ai_prediction") {
+      if (mode === "vulnerability_forecast") {
         const p = pt as AIPredictionPoint;
         color = probabilityToColor(p.flood_probability);
       } else {
@@ -75,12 +75,12 @@ export default function InteractiveMap({ points, mode, threshold }: Props) {
         renderer: canvasRef.current ?? undefined,
       });
 
-      if (mode === "ai_prediction") {
+      if (mode === "vulnerability_forecast") {
         const p = pt as AIPredictionPoint;
         circle.bindTooltip(`Risk: ${p.risk_level}`, { sticky: true });
         circle.bindPopup(`
           <div class="map-popup">
-            <h4>AI Risk Profile</h4>
+            <h4>Risk Profile</h4>
             <p><b>Probability:</b> ${(p.flood_probability * 100).toFixed(1)}%</p>
             <p><b>Risk Level:</b> ${p.risk_level}</p>
             <p><b>Elevation:</b> ${p.elevation_y2}m</p>

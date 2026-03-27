@@ -8,10 +8,10 @@ interface Props {
 }
 
 export default function MapLegend({ mode }: Props) {
-  if (mode === "ai_prediction") {
+  if (mode === "vulnerability_forecast") {
     return (
       <div className="map-legend">
-        <p className="legend-title">AI Flood Probability</p>
+        <p className="legend-title">Risk Intensity</p>
         {[
           { label: "Low (<25%)", color: probabilityToColor(0.1) },
           { label: "Moderate (25–50%)", color: probabilityToColor(0.35) },
@@ -29,7 +29,7 @@ export default function MapLegend({ mode }: Props) {
 
   return (
     <div className="map-legend">
-      <p className="legend-title">Change Analysis</p>
+      <p className="legend-title">Temporal Analysis</p>
       {[
         { label: "Stable / Safe", color: "#3b82f6" },
         { label: "Worsened (new flood risk)", color: "#ef4444" },

@@ -20,40 +20,49 @@ export const generateFloodReport = async (elementId: string, projectName: string
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      backgroundColor: isDark ? "#111827" : "#ffffff",
       logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      onclone: (clonedDoc) => {
+        const el = clonedDoc.getElementById(elementId);
+        if (el) {
+          el.style.height = 'auto';
+          el.style.overflow = 'visible';
+        }
+      }
     });
     
     const imgData = canvas.toDataURL("image/png");
     const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const imgWidth = 190; // mm (A4 width - margins)
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    // Header
-    doc.setFillColor(isDark ? 15 : 248, isDark ? 23 : 250, isDark ? 42 : 252);
-    doc.rect(0, 0, pdfWidth, 20, "F");
+    // Header styling
+    doc.setFillColor(isDark ? 31 : 243, isDark ? 41 : 244, isDark ? 55 : 246);
+    doc.rect(0, 0, pdfWidth, 25, "F");
     
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(isDark ? 248 : 15, isDark ? 250 : 23, isDark ? 252 : 42);
-    doc.setFontSize(14);
-    doc.text(projectName, 10, 13);
+    doc.setTextColor(isDark ? 255 : 31, isDark ? 255 : 41, isDark ? 255 : 55);
+    doc.setFontSize(16);
+    doc.text("Flood Risk Management Intelligence Report", 10, 15);
     
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, pdfWidth - 60, 13);
-    
-    // Main Image (Dashboard State)
-    doc.addImage(imgData, "PNG", 0, 25, pdfWidth, pdfHeight);
-    
-    // Analytics Section
-    doc.setFontSize(14);
-    doc.setTextColor(56, 189, 248);
-    doc.text("Project Dashboard Snapshot", 14, 110);
-    doc.addImage(imgData, 'PNG', 14, 115, 180, 100);
-
-    // Final metadata
     doc.setFontSize(10);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated on ${new Date().toLocaleString()}`, 14, 280);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Project Area: ${projectName}`, 10, 22);
+
+    // Main Content
+    doc.addImage(imgData, "PNG", 10, 35, imgWidth, imgHeight);
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Confidential Research Data - Integrated GIS/SQL Assessment System - Generated: ${new Date().toLocaleString()}`,
+      10,
+      pageHeight - 10
+    );
     
     doc.save(`${projectName.replace(/\s+/g, '_')}_Flood_Report.pdf`);
   } catch (err) {

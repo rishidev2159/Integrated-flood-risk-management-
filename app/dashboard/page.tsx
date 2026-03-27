@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import nextDynamic from "next/dynamic";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
   Layers,
@@ -16,16 +17,31 @@ import {
   TrendingUp,
   Activity,
   Map as MapIcon,
+  Menu,
+  X,
+  History
 } from "lucide-react";
 import { useFloodAnalysis, useAIPrediction, useTrainModel } from "@/hooks/useFloodAnalysis";
 import AnalysisCard from "@/components/stats/AnalysisCard";
 import AnalyticsHub from "@/components/stats/AnalyticsHub";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { MapMode } from "@/lib/types";
-import { formatNumber, formatPercent } from "@/lib/utils";
+import { formatNumber, formatPercent, cn } from "@/lib/utils";
 import { generateFloodReport } from "@/lib/reports";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-// Dynamic import for Leaflet - SSR disabled
+// Shadcn UI Components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
+import { 
+  ChartConfig, 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent 
+} from "@/components/ui/chart";
+
 const InteractiveMap = nextDynamic(() => import("@/components/map/InteractiveMap"), {
   ssr: false,
   loading: () => <div className="map-loading">Initialising spatial engine…</div>,
@@ -36,6 +52,7 @@ export const dynamic = "force-dynamic";
 type ViewMode = "year1" | "year2" | "comparison";
 
 export default function DashboardPage() {
+  const isMobile = useIsMobile();
   const [projectName, setProjectName] = useState("Loading Project...");
   const [threshold, setThreshold] = useState(19);
   const [draftThreshold, setDraftThreshold] = useState(19);
@@ -43,9 +60,10 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("comparison");
   const [aiEnabled, setAiEnabled] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { data: analysisData, isLoading, isError } = useFloodAnalysis(threshold);
-  const { data: predictionData } = useAIPrediction(threshold, aiEnabled && mapMode === "ai_prediction");
+  const { data: predictionData } = useAIPrediction(threshold, aiEnabled && mapMode === "vulnerability_forecast");
   const { mutate: train } = useTrainModel();
 
   useEffect(() => {
@@ -56,9 +74,9 @@ export default function DashboardPage() {
       .catch(() => setProjectName("EcoGuard Analysis"));
   }, []);
 
-  const filteredPoints = useMemo(() => {
+  const combinedPoints = useMemo(() => {
     if (!analysisData) return [];
-    if (mapMode === "ai_prediction" && predictionData) return predictionData.points;
+    if (mapMode === "vulnerability_forecast" && predictionData) return predictionData.points;
     if (viewMode === "comparison") return analysisData.points;
     
     return analysisData.points.map(p => ({
@@ -68,69 +86,108 @@ export default function DashboardPage() {
     }));
   }, [analysisData, predictionData, mapMode, viewMode, threshold]);
 
-  const handleRunAI = () => {
+  const handleRunForecast = () => {
     if (!aiEnabled) {
       train(threshold, {
         onSuccess: () => {
           setAiEnabled(true);
-          setMapMode("ai_prediction");
+          setMapMode("vulnerability_forecast");
         },
       });
     } else {
-      setMapMode("ai_prediction");
+      setMapMode("vulnerability_forecast");
     }
   };
 
   const downloadReport = async () => {
     if (!analysisData) return;
-    await generateFloodReport("dashboard-workspace", "Vijayawada Flood Analysis");
+    const reportTitle = projectName === "Loading Project..." ? "Flood Analysis Report" : `${projectName} Report`;
+    await generateFloodReport("dashboard-workspace", reportTitle);
   };
 
   return (
     <div id="dashboard-workspace" className="workspace-container">
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileMenuOpen(false)}
+            className="mobile-overlay"
+          />
+        )}
+      </AnimatePresence>
+
       {/* 1. LEFT SIDEBAR: Controls */}
-      <aside className={`workspace-sidebar workspace-sidebar--left ${!sidebarOpen ? "collapsed" : ""}`}>
-        <div className="sidebar-header">
+      <aside className={`workspace-sidebar workspace-sidebar--left ${!sidebarOpen ? "collapsed" : ""} ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-header flex justify-between items-center">
           <div className="brand-compact">
             <span className="brand-logo">🌊</span>
             <h2 className="brand-name">{projectName}</h2>
           </div>
+          <button onClick={() => setMobileMenuOpen(false)} className="mobile-only icon-btn">
+            <X size={20} />
+          </button>
         </div>
 
         <div className="sidebar-content">
           <div className="sidebar-section">
-            <label className="section-label">Temporal Perspective</label>
-            <div className="toggle-group">
-              {(["comparison", "year1", "year2"] as ViewMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setViewMode(m)}
-                  className={`toggle-btn ${viewMode === m ? "active" : ""}`}
-                >
-                  {m === "year1" ? "2024" : m === "year2" ? "2025" : "Delta Map"}
-                </button>
-              ))}
-            </div>
+            <label className="section-label">Analysis Mode</label>
+            <Tabs 
+              value={mapMode} 
+              onValueChange={(v) => v === "vulnerability_forecast" ? handleRunForecast() : setMapMode(v as MapMode)}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="analysis" className="gap-2">
+                  <Layers size={14} /> Observations
+                </TabsTrigger>
+                <TabsTrigger value="vulnerability_forecast" className="gap-2" onClick={handleRunForecast}>
+                  <Brain size={14} /> Forecast
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           <div className="sidebar-section">
-            <div className="section-header">
-              <label className="section-label">Flood Threshold</label>
-              <span className="value-tag">{draftThreshold}m</span>
+            <label className="section-label">Temporal Perspective</label>
+            <Tabs 
+              value={viewMode} 
+              onValueChange={(v) => setViewMode(v as ViewMode)}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="year1">2024</TabsTrigger>
+                <TabsTrigger value="year2">2025</TabsTrigger>
+                <TabsTrigger value="comparison">Delta</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          <div className="sidebar-section">
+            <div className="flex justify-between items-center mb-4">
+              <label className="section-label mb-0">Flood Threshold</label>
+              <span className="text-xs font-bold px-2 py-0.5 bg-accent/10 text-accent rounded-full">{draftThreshold}m</span>
             </div>
-            <input
-              type="range" min={5} max={35} step={0.5}
-              value={draftThreshold}
-              onChange={(e) => setDraftThreshold(Number(e.target.value))}
-              onMouseUp={() => setThreshold(draftThreshold)}
-              className="custom-range"
+            <Slider
+              value={[draftThreshold]}
+              min={5}
+              max={35}
+              step={0.5}
+              onValueChange={([val]) => setDraftThreshold(val)}
+              onPointerUp={() => setThreshold(draftThreshold)}
             />
           </div>
 
           <div className="sidebar-footer">
-            <button onClick={downloadReport} className="btn-primary w-full">
-              <FileDown size={16} /> Export Analysis
-            </button>
+            <Button 
+               onClick={downloadReport} 
+               className="w-full bg-accent hover:bg-accent/90"
+            >
+              <FileDown size={16} className="mr-2" /> Export Intelligence
+            </Button>
           </div>
         </div>
       </aside>
@@ -138,15 +195,22 @@ export default function DashboardPage() {
       {/* 2. CENTER: Map Viewport */}
       <main className="workspace-main">
         <header className="workspace-top-bar">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="icon-btn">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="desktop-only icon-btn">
             {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+          
+          <button onClick={() => setMobileMenuOpen(true)} className="mobile-only icon-btn">
+            <Menu size={20} />
           </button>
           
           <div className="breadcrumb">
             <MapIcon size={14} className="text-accent" />
             <span>GIS Analysis</span>
             <span className="divider">/</span>
-            <span className="current">{viewMode === "comparison" ? "Temporal Comparison" : `${viewMode === "year1" ? "2024" : "2025"} Observation`}</span>
+            <span className="current">
+              {mapMode === "vulnerability_forecast" ? "Vulnerability Forecast" : 
+               (viewMode === "comparison" ? "Temporal Comparison" : `${viewMode === "year1" ? "2024" : "2025"} Observation`)}
+            </span>
           </div>
 
           <div className="top-actions">
@@ -158,7 +222,11 @@ export default function DashboardPage() {
         </header>
 
         <div className="map-container-wrapper">
-          <InteractiveMap points={filteredPoints} mode="analysis" threshold={threshold} />
+          <InteractiveMap 
+            points={combinedPoints}
+            threshold={threshold}
+            mode={mapMode}
+          />
           
           {isLoading && (
             <div className="loading-overlay">

@@ -50,5 +50,5 @@ export interface TrainMetrics {
   model_status: string;
 }
 
-export type MapMode = "analysis" | "ai_prediction";
+export type MapMode = "analysis" | "vulnerability_forecast";
 export type ChangeFilter = "all" | "Worsened" | "Improved" | "Stable";

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import {
   PieChart,
   Pie,
@@ -8,91 +8,103 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import type { GeoPoint } from "@/lib/types";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
+} from "@/components/ui/card";
+import { 
+  ChartConfig, 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent
+} from "@/components/ui/chart";
 
 interface AnalyticsHubProps {
   points: GeoPoint[];
 }
 
+const chartConfig = {
+  stable: { label: "Stable", color: "hsl(var(--muted-foreground))" },
+  worsened: { label: "Worsened", color: "var(--red)" },
+  improved: { label: "Improved", color: "var(--green)" },
+  count: { label: "Points", color: "var(--accent)" }
+} satisfies ChartConfig;
+
 export default function AnalyticsHub({ points }: AnalyticsHubProps) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) return <div className="analytics-hub-skeleton" style={{ height: '400px' }} />;
   // 1. Status Distribution (Pie Chart)
-  const statusData = [
-    { name: "Stable", value: points.filter((p) => p.change_analysis === "Stable").length, color: "#94a3b8" },
-    { name: "Worsened", value: points.filter((p) => p.change_analysis === "Worsened").length, color: "#ef4444" },
-    { name: "Improved", value: points.filter((p) => p.change_analysis === "Improved").length, color: "#22c55e" },
-  ].filter(d => d.value > 0);
+  const statusData = useMemo(() => [
+    { name: "stable", value: points.filter((p) => p.change_analysis === "Stable").length, fill: "oklch(0.556 0 0)" },
+    { name: "worsened", value: points.filter((p) => p.change_analysis === "Worsened").length, fill: "var(--red)" },
+    { name: "improved", value: points.filter((p) => p.change_analysis === "Improved").length, fill: "var(--green)" },
+  ].filter(d => d.value > 0), [points]);
 
-  // 2. Delta Distribution (Histogram-like Bar Chart)
-  // Buckets: <-1m, -1to-0.5, -0.5to0.5 (Stable), 0.5to1, >1m
-  const deltaBuckets = [
+  // 2. Delta Distribution
+  const deltaBuckets = useMemo(() => [
     { range: "< -1m", count: points.filter(p => p.elevation_delta < -1).length },
     { range: "-1m to -0.5m", count: points.filter(p => p.elevation_delta >= -1 && p.elevation_delta < -0.5).length },
     { range: "Stable (±0.5m)", count: points.filter(p => p.elevation_delta >= -0.5 && p.elevation_delta <= 0.5).length },
     { range: "0.5m to 1m", count: points.filter(p => p.elevation_delta > 0.5 && p.elevation_delta <= 1).length },
     { range: "> 1m", count: points.filter(p => p.elevation_delta > 1).length },
-  ];
+  ], [points]);
 
   return (
-    <div className="analytics-hub">
-      {/* Pie Chart Section */}
-      <div className="analytics-section">
-        <label className="section-label">Terrain Stability Breakdown</label>
-        <div className="chart-wrapper">
-          <ResponsiveContainer width="100%" height={200}>
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Terrain Stability
+          </CardTitle>
+          <CardDescription className="text-[10px]">Comparative distribution of elevation shifts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
             <PieChart>
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
               <Pie
                 data={statusData}
-                innerRadius={50}
-                outerRadius={70}
-                paddingAngle={5}
                 dataKey="value"
-              >
-                {statusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
-                itemStyle={{ color: "var(--text-main)", fontSize: "12px" }}
+                nameKey="name"
+                innerRadius={60}
+                strokeWidth={5}
               />
-              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "10px", color: "var(--text-muted)" }} />
+              <ChartLegend content={<ChartLegendContent nameKey="name" payload={[]} />} />
             </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+          </ChartContainer>
+        </CardContent>
+      </Card>
 
-      {/* Bar Chart Section */}
-      <div className="analytics-section">
-        <label className="section-label">Elevation Delta Index</label>
-        <div className="chart-wrapper">
-          <ResponsiveContainer width="100%" height={220}>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Elevation Delta Index
+          </CardTitle>
+          <CardDescription className="text-[10px]">Real-time vertical shift magnitudes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
             <BarChart data={deltaBuckets} layout="vertical" margin={{ left: -10, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" hide />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted" />
               <YAxis 
                 dataKey="range" 
                 type="category" 
-                tick={{ fill: "var(--text-muted)", fontSize: 9 }} 
+                tick={{ fontSize: 9 }} 
                 width={80}
               />
-              <Tooltip 
-                cursor={{ fill: "var(--accent-glow)" }}
-                contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "8px" }}
-              />
+              <XAxis type="number" hide />
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Bar dataKey="count" fill="var(--accent)" radius={[0, 4, 4, 0]} />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <p className="chart-caption">Y1 - Y2 Elevation Delta (Numeric Shift)</p>
-      </div>
+          </ChartContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
