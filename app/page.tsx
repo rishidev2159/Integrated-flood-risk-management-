@@ -1,65 +1,71 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { motion } from "framer-motion";
+import FileUploader from "@/components/upload/FileUploader";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import Link from "next/link";
+import { Shield, Zap, BarChart3, Globe } from "lucide-react";
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="landing-main">
+      {/* Animated Background Elements */}
+      <div className="bg-gradient-glow" />
+      
+      <div className="landing-container">
+        {/* Hero Section */}
+        <section className="hero-section">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="hero-content"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <div className="badge-premium">Civil Engineering Research Initiative</div>
+            <h1 className="hero-title">
+              Integrated Flood Risk <span className="text-accent">Management</span>
+            </h1>
+            <p className="hero-subtitle">A SQL and GIS Based Approach</p>
+            <div className="author-credits">
+              <p><b>Authors:</b> R. Rohith Babu, Krishnam Raju, Sagar, Rishi Dev, Santhosh</p>
+              <p className="text-muted">Vignan&apos;s Institute of Information Technology (A), AP, India</p>
+            </div>
+
+            {/* Prominent Data Ingestion Flow */}
+            <div className="mt-12 w-full max-w-4xl mx-auto">
+              <div className="badge-premium mb-4">Phase 1: Multi-Temporal Data Ingestion</div>
+              <FileUploader />
+            </div>
+
+            <p className="hero-description mt-12 mb-12">
+              Advancing flood risk assessment through the combination of structured SQL databases 
+              and Geographic Information Systems (GIS) for precise hazard mapping in Vijayawada.
+            </p>
+          </motion.div>
+        </section>
+
+        {/* Feature Highlights - Research Oriented */}
+        <section className="research-highlights py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="highlight-item">
+              <h3 className="font-bold text-lg mb-2">GIS Framework</h3>
+              <p className="text-sm text-dim">Spatial analysis using Digital Elevation Models (DEM) for landscape vulnerability.</p>
+            </div>
+            <div className="highlight-item">
+              <h3 className="font-bold text-lg mb-2">SQL Integration</h3>
+              <p className="text-sm text-dim">Structured retrieval and managing of multi-temporal hydrological datasets.</p>
+            </div>
+            <div className="highlight-item">
+              <h3 className="font-bold text-lg mb-2">Decision Support</h3>
+              <p className="text-sm text-dim">Evidence-based tool for emergency response and urban development planning.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+      
+      <footer className="landing-footer py-8 border-t border-border w-full text-center">
+        <p className="text-xs text-muted">© 2026 Vignan&apos;s Institute of Information Technology (A) · Dept. of Civil Engineering</p>
+      </footer>
+    </main>
   );
 }
