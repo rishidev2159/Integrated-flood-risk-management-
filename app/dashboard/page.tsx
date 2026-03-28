@@ -1,295 +1,182 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import nextDynamic from "next/dynamic";
-import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
+import { motion } from "framer-motion";
+import { useFloodPoints, useRiskSummary } from "@/hooks/useSeaLevelData";
 import {
-  Brain,
-  Layers,
-  RefreshCw,
-  Sliders,
-  Loader2,
-  AlertCircle,
-  FileDown,
-  ChevronLeft,
-  ChevronRight,
-  TrendingDown,
-  TrendingUp,
   Activity,
+  AlertTriangle,
   Map as MapIcon,
-  Menu,
-  X,
-  History
+  TrendingUp,
+  FileText,
+  ArrowLeft,
+  Database
 } from "lucide-react";
-import { useFloodAnalysis, useAIPrediction, useTrainModel } from "@/hooks/useFloodAnalysis";
-import AnalysisCard from "@/components/stats/AnalysisCard";
-import AnalyticsHub from "@/components/stats/AnalyticsHub";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import type { MapMode } from "@/lib/types";
-import { formatNumber, formatPercent, cn } from "@/lib/utils";
-import { generateFloodReport } from "@/lib/reports";
-import { useIsMobile } from "@/hooks/use-mobile";
 
-// Shadcn UI Components
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
-import { 
-  ChartConfig, 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from "@/components/ui/chart";
-
-const InteractiveMap = nextDynamic(() => import("@/components/map/InteractiveMap"), {
+const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   ssr: false,
-  loading: () => <div className="map-loading">Initialising spatial engine…</div>,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-900 animate-pulse rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-white/10">
+      <div className="flex flex-col items-center gap-4 text-slate-400">
+        <MapIcon className="w-12 h-12" />
+        <span className="text-xs sm:text-sm font-bold uppercase tracking-widest">Initializing Spatial Engine...</span>
+      </div>
+    </div>
+  )
 });
 
-export const dynamic = "force-dynamic";
-
-type ViewMode = "year1" | "year2" | "comparison";
-
 export default function DashboardPage() {
-  const isMobile = useIsMobile();
-  const [projectName, setProjectName] = useState("Loading Project...");
-  const [threshold, setThreshold] = useState(19);
-  const [draftThreshold, setDraftThreshold] = useState(19);
-  const [mapMode, setMapMode] = useState<MapMode>("analysis");
-  const [viewMode, setViewMode] = useState<ViewMode>("comparison");
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: points = [], isLoading: pointsLoading } = useFloodPoints();
+  const { data: summary = [], isLoading: summaryLoading } = useRiskSummary();
 
-  const { data: analysisData, isLoading, isError } = useFloodAnalysis(threshold);
-  const { data: predictionData } = useAIPrediction(threshold, aiEnabled && mapMode === "vulnerability_forecast");
-  const { mutate: train } = useTrainModel();
+  const getCount = (status: string) => summary.find(s => s.status.includes(status))?.count || 0;
+  const highRisk = getCount("High");
+  const modRisk = getCount("Moderate");
+  const safe = getCount("Safe");
+  const total = highRisk + modRisk + safe;
 
-  useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
-    fetch(`${apiBase}/api/metadata`)
-      .then(res => res.json())
-      .then(data => setProjectName(data.name || "EcoGuard Analysis"))
-      .catch(() => setProjectName("EcoGuard Analysis"));
-  }, []);
-
-  const combinedPoints = useMemo(() => {
-    if (!analysisData) return [];
-    if (mapMode === "vulnerability_forecast" && predictionData) return predictionData.points;
-    if (viewMode === "comparison") return analysisData.points;
-    
-    return analysisData.points.map(p => ({
-      ...p,
-      status_y2: viewMode === "year1" ? (p.elevation_y1 <= threshold ? "Flooded" : "Safe") : p.status_y2,
-      change_analysis: "Stable" as const,
-    }));
-  }, [analysisData, predictionData, mapMode, viewMode, threshold]);
-
-  const handleRunForecast = () => {
-    if (!aiEnabled) {
-      train(threshold, {
-        onSuccess: () => {
-          setAiEnabled(true);
-          setMapMode("vulnerability_forecast");
-        },
-      });
-    } else {
-      setMapMode("vulnerability_forecast");
-    }
-  };
-
-  const downloadReport = async () => {
-    if (!analysisData) return;
-    const reportTitle = projectName === "Loading Project..." ? "Flood Analysis Report" : `${projectName} Report`;
-    await generateFloodReport("dashboard-workspace", reportTitle);
+  const handleDownloadReport = () => {
+    window.print();
   };
 
   return (
-    <div id="dashboard-workspace" className="workspace-container">
-      {/* Mobile Overlay */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setMobileMenuOpen(false)}
-            className="mobile-overlay"
-          />
-        )}
-      </AnimatePresence>
+    <main className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-white p-4 sm:p-6 md:p-10 2xl:p-16 transition-colors duration-300 print:bg-white print:text-black print:p-0">
+      <div className="max-w-[1800px] 2xl:max-w-[1920px] mx-auto relative z-10 space-y-8 sm:space-y-12 2xl:space-y-16 print:space-y-6">
 
-      {/* 1. LEFT SIDEBAR: Controls */}
-      <aside className={`workspace-sidebar workspace-sidebar--left ${!sidebarOpen ? "collapsed" : ""} ${mobileMenuOpen ? "mobile-open" : ""}`}>
-        <div className="sidebar-header flex justify-between items-center">
-          <div className="brand-compact">
-            <span className="brand-logo">🌊</span>
-            <h2 className="brand-name">{projectName}</h2>
-          </div>
-          <button onClick={() => setMobileMenuOpen(false)} className="mobile-only icon-btn">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="sidebar-content">
-          <div className="sidebar-section">
-            <label className="section-label">Analysis Mode</label>
-            <Tabs 
-              value={mapMode} 
-              onValueChange={(v) => v === "vulnerability_forecast" ? handleRunForecast() : setMapMode(v as MapMode)}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="analysis" className="gap-2">
-                  <Layers size={14} /> Observations
-                </TabsTrigger>
-                <TabsTrigger value="vulnerability_forecast" className="gap-2" onClick={handleRunForecast}>
-                  <Brain size={14} /> Forecast
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          <div className="sidebar-section">
-            <label className="section-label">Temporal Perspective</label>
-            <Tabs 
-              value={viewMode} 
-              onValueChange={(v) => setViewMode(v as ViewMode)}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="year1">2024</TabsTrigger>
-                <TabsTrigger value="year2">2025</TabsTrigger>
-                <TabsTrigger value="comparison">Delta</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          <div className="sidebar-section">
-            <div className="flex justify-between items-center mb-4">
-              <label className="section-label mb-0">Flood Threshold</label>
-              <span className="text-xs font-bold px-2 py-0.5 bg-accent/10 text-accent rounded-full">{draftThreshold}m</span>
-            </div>
-            <Slider
-              value={[draftThreshold]}
-              min={5}
-              max={35}
-              step={0.5}
-              onValueChange={([val]) => setDraftThreshold(val)}
-              onPointerUp={() => setThreshold(draftThreshold)}
-            />
-          </div>
-
-          <div className="sidebar-footer">
-            <Button 
-               onClick={downloadReport} 
-               className="w-full bg-accent hover:bg-accent/90"
-            >
-              <FileDown size={16} className="mr-2" /> Export Intelligence
-            </Button>
+        {/* Print-Only Academic Header */}
+        <div className="hidden print:block border-b-2 border-slate-200 pb-6 mb-8">
+          <h1 className="text-3xl font-black tracking-tight mb-2">Integrated Flood Risk Management Framework</h1>
+          <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest text-slate-500">
+            <span>Flood Risk Intelligence System</span>
+            <span>Research Analysis Report</span>
           </div>
         </div>
-      </aside>
 
-      {/* 2. CENTER: Map Viewport */}
-      <main className="workspace-main">
-        <header className="workspace-top-bar">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="desktop-only icon-btn">
-            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </button>
-          
-          <button onClick={() => setMobileMenuOpen(true)} className="mobile-only icon-btn">
-            <Menu size={20} />
-          </button>
-          
-          <div className="breadcrumb">
-            <MapIcon size={14} className="text-accent" />
-            <span>GIS Analysis</span>
-            <span className="divider">/</span>
-            <span className="current">
-              {mapMode === "vulnerability_forecast" ? "Vulnerability Forecast" : 
-               (viewMode === "comparison" ? "Temporal Comparison" : `${viewMode === "year1" ? "2024" : "2025"} Observation`)}
-            </span>
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 print:hidden">
+          <div className="space-y-2">
+            <Link href="/" className="inline-flex items-center text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-accent transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Ingestion
+            </Link>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">
+              Flood Risk <span className="text-accent underline decoration-accent/30 decoration-4 underline-offset-8">Intelligence</span>
+            </h1>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest pt-2">PostGIS Spatial Analysis Dashboard · VIIT Research</p>
           </div>
-
-          <div className="top-actions">
-            <div className="study-area-badge">
-              Vijayawada Region
-            </div>
+          <div className="flex items-center gap-3 sm:gap-4 self-start md:self-auto">
             <ThemeToggle />
+            <button
+              onClick={handleDownloadReport}
+              className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl sm:rounded-2xl shadow-sm transition-all text-xs font-black uppercase tracking-widest"
+            >
+              <FileText className="w-4 h-4" />
+              Report
+            </button>
           </div>
         </header>
 
-        <div className="map-container-wrapper">
-          <InteractiveMap 
-            points={combinedPoints}
-            threshold={threshold}
-            mode={mapMode}
-          />
-          
-          {isLoading && (
-            <div className="loading-overlay">
-              <div className="loader-card">
-                <Loader2 size={24} className="spin text-accent" />
-                <span>Synchronizing GIS Data...</span>
+        <div id="report-content" className="space-y-8 sm:space-y-12 2xl:space-y-16 print:space-y-8">
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 print:grid-cols-4">
+            <StatCard title="Target Points" value={total.toLocaleString()} icon={<Activity className="w-4 h-4 text-blue-500" />} subtitle="Analyzed via Spatial Join" />
+            <StatCard title="High Risk" value={highRisk.toLocaleString()} icon={<AlertTriangle className="w-4 h-4 text-red-500" />} color="text-red-500" border="border-red-500/20" subtitle="Elevation < 19m" />
+            <StatCard title="Moderate Risk" value={modRisk.toLocaleString()} icon={<TrendingUp className="w-4 h-4 text-yellow-500" />} color="text-yellow-600" border="border-yellow-500/20" subtitle="Elevation 19m-21m" />
+            <StatCard title="Safety Index" value={`${total > 0 ? ((safe / total) * 100).toFixed(1) : 0}%`} icon={<Activity className="w-4 h-4 text-green-500" />} color="text-green-500" border="border-green-500/20" subtitle="Areas Above 21m" />
+          </div>
+
+          {/* Main Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:grid-cols-1 print:gap-12">
+            <div className="lg:col-span-8 xl:col-span-9 h-[450px] sm:h-[600px] lg:h-[700px] print:h-[180mm] map-container">
+              <MapComponent points={points} />
+            </div>
+
+            <aside className="lg:col-span-4 xl:col-span-3 space-y-6 print:lg:col-span-12">
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-6 shadow-sm dark:shadow-none h-full max-h-[700px] flex flex-col print:border-0 print:p-0 print:max-h-none">
+                <h3 className="font-black text-xs sm:text-sm uppercase tracking-widest mb-6 flex items-center gap-2 text-slate-400">
+                  <MapIcon className="w-4 h-4 text-accent" />
+                  Live Feed
+                </h3>
+                <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar print:overflow-visible print:pr-0">
+                  {pointsLoading ? (
+                    Array(6).fill(0).map((_, i) => (
+                      <div key={i} className="h-20 bg-slate-100 dark:bg-white/5 rounded-2xl animate-pulse" />
+                    ))
+                  ) : points.length > 0 ? (
+                    points.slice(0, 10).map((p) => (
+                      <div key={p.current_index} className="p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-accent hover:bg-white dark:hover:bg-white/10 transition-all group print:bg-white print:border-slate-200">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[9px] font-black font-mono text-slate-400 group-hover:text-accent transition-colors">{p.current_index}</span>
+                          <div className={`text-[9px] px-2 py-0.5 rounded-full font-bold border uppercase tracking-tighter ${p.risk_status.includes("High") ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                              p.risk_status.includes("Moderate") ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' :
+                                'bg-green-500/10 text-green-600 border-green-500/20'
+                            }`}>
+                            {p.risk_status.split(' ')[0]}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-slate-400 font-bold uppercase tracking-widest print:text-slate-600">Elevation (Current)</span>
+                          <span className="font-extrabold font-mono text-sm">{p.elevation_current}m</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
+                      <Database className="w-8 h-8 opacity-20" />
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] italic">No data ingested</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          {/* Print-Only Academic Footer */}
+          <div className="hidden print:block space-y-12 border-t-2 border-slate-100 pt-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">Research Abstract</h4>
+                <p className="text-xs text-slate-600 leading-relaxed text-justify italic">
+                  This research contributes to the improvement of flood risk management through the combination of databases which uses SQL Server software and Geographic Information Systems (GIS). Spatial analysis techniques were used for the evaluation of important factors influenced by elevation and topology in the Vijayawada region.
+                </p>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">Research Contributors</h4>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  <span>Mr. R. Rohith Babu</span>
+                  <span>Krishnam Raju</span>
+                  <span>Sagar</span>
+                  <span>Rishi Dev</span>
+                  <span>Santhosh</span>
+                </div>
+                <p className="text-[9px] text-center text-slate-400 font-black pt-4">VIIT - Vignan's Institute of Information Technology (A) · Visakhapatnam, AP, India</p>
               </div>
             </div>
-          )}
+          </div>
+
         </div>
-      </main>
+      </div>
+    </main>
+  );
+}
 
-      {/* 3. RIGHT SIDEBAR: Analytics Hub */}
-      <aside className="workspace-sidebar workspace-sidebar--right">
-        <div className="sidebar-header">
-          <h3 className="section-label">Flood Risk Analytics</h3>
+function StatCard({ title, value, icon, subtitle, color = "text-slate-900 dark:text-white", border = "border-slate-200 dark:border-white/10" }: any) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`bg-white dark:bg-white/5 border rounded-2xl sm:rounded-3xl p-6 shadow-sm dark:shadow-none hover:shadow-xl dark:hover:border-accent/40 transition-all group ${border}`}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <h4 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400">{title}</h4>
+        <div className="p-2 sm:p-2.5 bg-slate-100 dark:bg-white/5 rounded-xl group-hover:bg-accent/10 group-hover:text-accent transition-all">
+          {icon}
         </div>
-
-        <div className="sidebar-content">
-          {analysisData?.summary && (
-            <>
-              <div className="risk-gauge-container">
-                <div className="gauge-outer">
-                  <div 
-                    className="gauge-inner" 
-                    style={{ transform: `rotate(${(analysisData.summary.flood_risk_percentage * 1.8) - 90}deg)` }}
-                  />
-                  <div className="gauge-center">
-                    <span className="gauge-val">{analysisData.summary.flood_risk_percentage}%</span>
-                    <span className="gauge-label">Inundated</span>
-                  </div>
-                </div>
-              </div>
-
-              <AnalyticsHub points={analysisData.points} />
-
-              <div className="metrics-grid mt-4">
-                <div className="metric-box border-red">
-                  <span className="m-label text-red">Worsened Terrain</span>
-                  <div className="m-row">
-                    <TrendingDown size={14} className="text-red" />
-                    <span className="m-val">{formatNumber(analysisData.summary.newly_vulnerable_points)} pts</span>
-                  </div>
-                </div>
-                <div className="metric-box border-green">
-                  <span className="m-label text-green">Stable / Improved</span>
-                  <div className="m-row">
-                    <TrendingUp size={14} className="text-green" />
-                    <span className="m-val">{formatNumber(analysisData.summary.improved_points + analysisData.summary.stable_points)} pts</span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {isError && (
-            <div className="error-card">
-              <AlertCircle size={20} />
-              <p>GIS Database connection lost.</p>
-            </div>
-          )}
-        </div>
-      </aside>
-    </div>
+      </div>
+      <div className={`text-2xl sm:text-3xl font-black tracking-tight ${color}`}>{value}</div>
+      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-widest">{subtitle}</p>
+    </motion.div>
   );
 }
