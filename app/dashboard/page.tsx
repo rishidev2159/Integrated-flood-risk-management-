@@ -105,8 +105,8 @@ export default function DashboardPage() {
                       <div key={i} className="h-20 bg-slate-100 dark:bg-white/5 rounded-2xl animate-pulse" />
                     ))
                   ) : points.length > 0 ? (
-                    points.slice(0, 10).map((p) => (
-                      <div key={p.current_index} className="p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-accent hover:bg-white dark:hover:bg-white/10 transition-all group print:bg-white print:border-slate-200">
+                    points.slice(0, 10).map((p, i) => (
+                      <div key={p.id || i} className="p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-accent hover:bg-white dark:hover:bg-white/10 transition-all group print:bg-white print:border-slate-200">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-[9px] font-black font-mono text-slate-400 group-hover:text-accent transition-colors">{p.current_index}</span>
                           <div className={`text-[9px] px-2 py-0.5 rounded-full font-bold border uppercase tracking-tighter ${p.risk_status.includes("High") ? 'bg-red-500/10 text-red-500 border-red-500/20' :
@@ -144,12 +144,19 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-4">
                 <h4 className="text-sm font-black uppercase tracking-widest text-slate-900">Research Contributors</h4>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  <span>Mr. R. Rohith Babu</span>
-                  <span>Krishnam Raju</span>
-                  <span>Sagar</span>
-                  <span>Rishi Dev</span>
-                  <span>Santhosh</span>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  {[
+                    { name: "M Rishi Dev", role: "Dept. of Civil Engineering, VIIT" },
+                    { name: "P Santhosh", role: "Dept. of Civil Engineering, VIIT" },
+                    { name: "R Rohith Babu", role: "Dept. of Civil Engineering, VIIT" },
+                    { name: "G Krishnam Raju", role: "Dept. of Civil Engineering, VIIT" },
+                    { name: "K Sagar", role: "Dept. of Civil Engineering, VIIT" },
+                  ].map((author, index) => (
+                    <div key={index} className="flex flex-col gap-0.5">
+                      <span className="text-slate-900 border-b border-slate-100 pb-0.5">{author.name}</span>
+                      <span className="text-[8px] opacity-70">{author.role}</span>
+                    </div>
+                  ))}
                 </div>
                 <p className="text-[9px] text-center text-slate-400 font-black pt-4">VIIT - Vignan's Institute of Information Technology (A) · Visakhapatnam, AP, India</p>
               </div>

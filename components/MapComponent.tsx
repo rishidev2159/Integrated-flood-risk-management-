@@ -36,9 +36,9 @@ const RADIUS_CONFIG = {
 ================================ */
 
 const getFloodColor = (elevation: number) => {
-  if (elevation < 21) return "#ff0000";
-  if (elevation < 23) return "#ffff00";
-  return "#0000ff";
+  if (elevation < 19) return "#ef4444"; // Red (High)
+  if (elevation <= 21) return "#eab308"; // Yellow (Moderate)
+  return "#22c55e"; // Green (Safe)
 };
 
 // ✅ Smooth linear scaling (stable & predictable)
@@ -179,7 +179,7 @@ export default function MapComponent({ points }: MapProps) {
         {/* Markers */}
         {points.map((pt, idx) => (
           <ResponsiveCircleMarker
-            key={`${pt.current_index}-${idx}`}
+            key={pt.id || idx}
             center={[pt.latitude, pt.longitude]}
             radius={radius}
             color={getFloodColor(pt.elevation_current)}
@@ -203,8 +203,8 @@ export default function MapComponent({ points }: MapProps) {
                         pt.elevation_current < 21
                           ? "text-red-600"
                           : pt.elevation_current < 23
-                          ? "text-yellow-600"
-                          : "text-blue-600"
+                            ? "text-yellow-600"
+                            : "text-blue-600"
                       }
                     >
                       {pt.risk_status}
@@ -226,24 +226,24 @@ export default function MapComponent({ points }: MapProps) {
       </MapContainer>
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white/90 text-slate-900 rounded-lg shadow-md p-3 text-xs space-y-2">
+      <div className="absolute bottom-6 left-6 z-1000 bg-white/95 text-slate-900 rounded-2xl shadow-2xl p-4 text-[10px] sm:text-xs space-y-3 border border-white/20 backdrop-blur-sm transition-all hover:scale-105">
         <p className="font-bold text-sm border-b pb-1">
           Risk Legend
         </p>
 
         <div className="flex items-center space-x-2">
-          <span className="w-4 h-4 rounded-full bg-red-600"></span>
-          <span>High Risk (Low Elevation)</span>
+          <span className="w-4 h-4 rounded-full bg-red-500"></span>
+          <span>High Risk (&lt;19m)</span>
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="w-4 h-4 rounded-full bg-yellow-400"></span>
-          <span>Moderate Risk</span>
+          <span className="w-4 h-4 rounded-full bg-yellow-500"></span>
+          <span>Moderate Risk (19m-21m)</span>
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="w-4 h-4 rounded-full bg-blue-600"></span>
-          <span>Safe</span>
+          <span className="w-4 h-4 rounded-full bg-green-500"></span>
+          <span>Safe Zone (&gt;21m)</span>
         </div>
       </div>
     </div>

@@ -44,11 +44,16 @@ CREATE TRIGGER trg_populate_elevation_secondary_geom
 BEFORE INSERT OR UPDATE ON elevation_secondary
 FOR EACH ROW EXECUTE FUNCTION populate_elevation_geom();
 
--- 5. Create Flood Risk SQL View (Choice B Analysis)
--- Logic: Classifies risk based on elevation comparison where both sources indicate vulnerability.
-CREATE OR REPLACE VIEW flood_risk_view AS
+-- 5. Create Flood Risk SQL View (Refined GIS Logic)
+-- Logic: Uses Spatial Join (ST_DWithin) to correlate source A and source B points
+-- Adds a deterministic ROW_NUMBER as 'id' for stable frontend rendering
+DROP VIEW IF EXISTS flood_risk_view;
+
+CREATE VIEW flood_risk_view AS
 SELECT 
-    p.system_index,
+    ROW_NUMBER() OVER () as id, -- Guaranteed unique identifier for React keys
+    p.system_index as baseline_index,
+    s.system_index as current_index,
     p.latitude,
     p.longitude,
     p.elevation as elevation_baseline,
@@ -60,16 +65,16 @@ SELECT
         ELSE 'Safe Zone (Green)'
     END as risk_status,
     CASE 
-        WHEN p.elevation - s.elevation > 0.5 THEN 'Worsened'
-        WHEN p.elevation - s.elevation < -0.5 THEN 'Improved'
+        WHEN (p.elevation - s.elevation) > 0.5 THEN 'Worsened'
+        WHEN (p.elevation - s.elevation) < -0.5 THEN 'Improved'
         ELSE 'Stable'
     END as change_analysis,
     p.geom
 FROM elevation_primary p
-JOIN elevation_secondary s ON p.system_index = s.system_index;
+INNER JOIN elevation_secondary s 
+ON ST_DWithin(p.geom, s.geom, 0.0001);
 
 -- 6. RPC Function for Aggregated Analytics
--- Returns counts for each risk status
 CREATE OR REPLACE FUNCTION get_risk_summary()
 RETURNS TABLE (status TEXT, count BIGINT) AS $$
 BEGIN
@@ -79,3 +84,20 @@ BEGIN
     GROUP BY risk_status;
 END;
 $$ LANGUAGE plpgsql;
+
+-- 7. High-Performance Clear RPC (TRUNCATE)
+-- Uses SECURITY DEFINER and a fixed search_path for permission stability
+CREATE OR REPLACE FUNCTION clear_elevation_data()
+RETURNS void AS $$
+BEGIN
+    TRUNCATE TABLE elevation_primary CASCADE;
+    TRUNCATE TABLE elevation_secondary CASCADE;
+END;
+$$ LANGUAGE plpgsql 
+SECURITY DEFINER
+SET search_path = public;
+
+-- 8. Permissions
+GRANT EXECUTE ON FUNCTION clear_elevation_data() TO anon;
+GRANT EXECUTE ON FUNCTION clear_elevation_data() TO authenticated;
+GRANT EXECUTE ON FUNCTION clear_elevation_data() TO service_role;

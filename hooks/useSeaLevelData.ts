@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 export interface FloodPoint {
+  id: number;
   baseline_index: string;
   current_index: string;
   latitude: number;

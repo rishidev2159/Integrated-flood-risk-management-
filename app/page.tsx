@@ -7,11 +7,11 @@ import { GraduationCap, ShieldCheck, Map, Database, Info, FileText } from "lucid
 
 export default function Home() {
   const authors = [
-    { name: "Mr. R. Rohith Babu", role: "Department of Civil Engineering, VIIT" },
-    { name: "Krishnam Raju", role: "Department of Civil Engineering, VIIT" },
-    { name: "Sagar", role: "Department of Civil Engineering, VIIT" },
-    { name: "Rishi Dev", role: "Department of Civil Engineering, VIIT" },
-    { name: "Santhosh", role: "Department of Civil Engineering, VIIT" },
+    { name: "M Rishi Dev", dept: "Civil Engineering, VIIT" },
+    { name: "P Santhosh", dept: "Civil Engineering, VIIT" },
+    { name: "R Rohith Babu", dept: "Civil Engineering, VIIT" },
+    { name: "G Krishnam Raju", dept: "Civil Engineering, VIIT" },
+    { name: "K Sagar", dept: "Civil Engineering, VIIT" },
   ];
 
   return (
@@ -55,8 +55,10 @@ export default function Home() {
                 
                 <div className="flex flex-wrap justify-center lg:justify-start gap-2 pt-2">
                   {authors.map((author, i) => (
-                    <span key={i} className="text-[10px] sm:text-[11px] font-bold px-2.5 py-1 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
-                      {author.name}
+                    <span key={i} className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
+                      <span className="text-[10px] sm:text-[11px] font-black text-slate-900 dark:text-white">{author.name}</span>
+                      <span className="hidden sm:block text-[10px] opacity-30">|</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{author.dept}</span>
                     </span>
                   ))}
                 </div>

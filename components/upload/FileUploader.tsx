@@ -71,9 +71,12 @@ export default function FileUploader() {
     setError(null);
 
     try {
+      // 1. Clear massive datasets via high-performance RPC
+      const { error: clearError } = await supabase.rpc('clear_elevation_data');
+      if (clearError) throw clearError;
+
       const dataA = mapData(await parseCSV(files.year1));
       setProgress(30);
-      await supabase.from('elevation_primary').delete().neq('id', -1);
       
       for (let i = 0 ; i < dataA.length; i += 1000) {
         const batch = dataA.slice(i, i + 1000);
@@ -84,7 +87,6 @@ export default function FileUploader() {
 
       const dataB = mapData(await parseCSV(files.year2));
       setProgress(60);
-      await supabase.from('elevation_secondary').delete().neq('id', -1);
 
       for (let i = 0 ; i < dataB.length; i += 1000) {
         const batch = dataB.slice(i, i + 1000);
