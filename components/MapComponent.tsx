@@ -14,6 +14,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 
 interface MapProps {
   points: FloodPoint[];
+  riverPoints?: FloodPoint[];
 }
 
 /* ================================
@@ -141,11 +142,13 @@ function ResponsiveCircleMarker({
    MAIN COMPONENT
 ================================ */
 
-export default function MapComponent({ points }: MapProps) {
+export default function MapComponent({ points, riverPoints = [] }: MapProps) {
   const [zoom, setZoom] = useState(MAP_CONFIG.ZOOM);
 
   // ✅ Derived value (no need for useState)
   const radius = useMemo(() => computeRadius(zoom), [zoom]);
+
+  const allPoints = useMemo(() => [...points, ...riverPoints], [points, riverPoints]);
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-slate-950">
@@ -173,13 +176,13 @@ export default function MapComponent({ points }: MapProps) {
         />
 
         {/* Helpers */}
-        <FitBounds points={points} />
+        <FitBounds points={allPoints} />
         <ZoomController onZoomChange={setZoom} />
 
-        {/* Markers */}
+        {/* Risk Markers */}
         {points.map((pt, idx) => (
           <ResponsiveCircleMarker
-            key={pt.id || idx}
+            key={`risk-${pt.id || idx}`}
             center={[pt.latitude, pt.longitude]}
             radius={radius}
             color={getFloodColor(pt.elevation_current)}
@@ -223,6 +226,28 @@ export default function MapComponent({ points }: MapProps) {
             </Popup>
           </ResponsiveCircleMarker>
         ))}
+
+        {/* River Markers */}
+        {riverPoints.map((pt, idx) => (
+          <ResponsiveCircleMarker
+            key={`river-${pt.id || idx}`}
+            center={[pt.latitude, pt.longitude]}
+            radius={radius}
+            color="#0ea5e9"
+          >
+            <Popup>
+              <div className="text-slate-900 p-1">
+                <p className="font-bold border-b mb-1 pb-1">
+                  Krishna River Point
+                </p>
+                <div className="text-xs space-y-1">
+                  <p>Elevation: <strong>{pt.elevation_current}m</strong></p>
+                  <p className="text-[10px] text-slate-400 mt-2">Index: {pt.baseline_index}</p>
+                </div>
+              </div>
+            </Popup>
+          </ResponsiveCircleMarker>
+        ))}
       </MapContainer>
 
       {/* Legend */}
@@ -244,6 +269,11 @@ export default function MapComponent({ points }: MapProps) {
         <div className="flex items-center space-x-2">
           <span className="w-4 h-4 rounded-full bg-green-500"></span>
           <span>Safe Zone (&gt;21m)</span>
+        </div>
+
+        <div className="flex items-center space-x-2 border-t pt-2 mt-2">
+          <span className="w-4 h-4 rounded-full bg-[#0ea5e9]"></span>
+          <span>Krishna River Data</span>
         </div>
       </div>
     </div>

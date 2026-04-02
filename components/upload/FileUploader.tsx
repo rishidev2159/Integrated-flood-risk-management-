@@ -9,9 +9,10 @@ import Papa from "papaparse";
 import { supabase } from "@/lib/supabase";
 
 export default function FileUploader() {
-  const [files, setFiles] = useState<{ year1: File | null; year2: File | null }>({
+  const [files, setFiles] = useState<{ year1: File | null; year2: File | null; river: File | null }>({
     year1: null,
     year2: null,
+    river: null,
   });
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -28,6 +29,11 @@ export default function FileUploader() {
     setError(null);
   };
 
+  const onDropRiver = (acceptedFiles: File[]) => {
+    setFiles((prev) => ({ ...prev, river: acceptedFiles[0] }));
+    setError(null);
+  };
+
   const { getRootProps: getRoot1, getInputProps: getInput1 } = useDropzone({
     onDrop: onDropYear1,
     accept: { "text/csv": [".csv"] },
@@ -36,6 +42,12 @@ export default function FileUploader() {
 
   const { getRootProps: getRoot2, getInputProps: getInput2 } = useDropzone({
     onDrop: onDropYear2,
+    accept: { "text/csv": [".csv"] },
+    multiple: false,
+  });
+
+  const { getRootProps: getRoot3, getInputProps: getInput3 } = useDropzone({
+    onDrop: onDropRiver,
     accept: { "text/csv": [".csv"] },
     multiple: false,
   });
@@ -76,23 +88,34 @@ export default function FileUploader() {
       if (clearError) throw clearError;
 
       const dataA = mapData(await parseCSV(files.year1));
-      setProgress(30);
+      setProgress(20);
       
       for (let i = 0 ; i < dataA.length; i += 1000) {
         const batch = dataA.slice(i, i + 1000);
         const { error: err } = await supabase.from('elevation_primary').insert(batch);
         if (err) throw err;
-        setProgress(30 + Math.floor((i / dataA.length) * 20));
+        setProgress(20 + Math.floor((i / dataA.length) * 20));
       }
 
       const dataB = mapData(await parseCSV(files.year2));
-      setProgress(60);
+      setProgress(40);
 
       for (let i = 0 ; i < dataB.length; i += 1000) {
         const batch = dataB.slice(i, i + 1000);
         const { error: err } = await supabase.from('elevation_secondary').insert(batch);
         if (err) throw err;
-        setProgress(60 + Math.floor((i / dataB.length) * 30));
+        setProgress(40 + Math.floor((i / dataB.length) * 30));
+      }
+
+      if (files.river) {
+        const dataR = mapData(await parseCSV(files.river));
+        setProgress(70);
+        for (let i = 0 ; i < dataR.length; i += 1000) {
+          const batch = dataR.slice(i, i + 1000);
+          const { error: err } = await supabase.from('river_data').insert(batch);
+          if (err) throw err;
+          setProgress(70 + Math.floor((i / dataR.length) * 25));
+        }
       }
 
       setProgress(100);
@@ -106,7 +129,7 @@ export default function FileUploader() {
 
   return (
     <div className="ring-1 ring-slate-200 dark:ring-white/10 p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-white/5 backdrop-blur-xl shadow-xl dark:shadow-none">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <DropzoneBox 
           getRootProps={getRoot1} 
           getInputProps={getInput1} 
@@ -120,6 +143,13 @@ export default function FileUploader() {
           file={files.year2} 
           label="Source B: Satellite" 
           sub="Current Data" 
+        />
+        <DropzoneBox 
+          getRootProps={getRoot3} 
+          getInputProps={getInput3} 
+          file={files.river} 
+          label="Source C: River" 
+          sub="Krishna Dataset" 
         />
       </div>
 
@@ -140,7 +170,7 @@ export default function FileUploader() {
               key="btn"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               onClick={handleIngest}
-              disabled={!files.year1 || !files.year2}
+              disabled={!files.year1 || !files.year2 || !files.river}
               className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-slate-900 dark:bg-accent text-white dark:text-black font-black rounded-2xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg dark:shadow-[0_0_25px_rgba(94,241,255,0.3)] disabled:opacity-50 disabled:grayscale uppercase tracking-widest text-xs"
             >
               <Database className="w-4 h-4 mr-3" />

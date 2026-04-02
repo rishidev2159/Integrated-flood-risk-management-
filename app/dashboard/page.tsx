@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { useFloodPoints, useRiskSummary } from "@/hooks/useSeaLevelData";
+import { useFloodPoints, useRiskSummary, useRiverPoints, useSpatialStats } from "@/hooks/useSeaLevelData";
 import {
   Activity,
   AlertTriangle,
@@ -30,6 +30,8 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
 export default function DashboardPage() {
   const { data: points = [], isLoading: pointsLoading } = useFloodPoints();
   const { data: summary = [], isLoading: summaryLoading } = useRiskSummary();
+  const { data: riverPoints = [] } = useRiverPoints();
+  const { data: stats } = useSpatialStats();
 
   const getCount = (status: string) => summary.find(s => s.status.includes(status))?.count || 0;
   const highRisk = getCount("High");
@@ -80,17 +82,18 @@ export default function DashboardPage() {
         <div id="report-content" className="space-y-8 sm:space-y-12 2xl:space-y-16 print:space-y-8">
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 print:grid-cols-4">
-            <StatCard title="Target Points" value={total.toLocaleString()} icon={<Activity className="w-4 h-4 text-blue-500" />} subtitle="Analyzed via Spatial Join" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 print:grid-cols-5">
+            <StatCard title="Points Analyzed" value={(stats?.total_elevation_points || total).toLocaleString()} icon={<Activity className="w-4 h-4 text-blue-500" />} subtitle="Total Ingested Nodes" />
+            <StatCard title="River Nodes" value={(stats?.total_river_points || riverPoints.length).toLocaleString()} icon={<Database className="w-4 h-4 text-sky-500" />} subtitle="Krishna Dataset" />
             <StatCard title="High Risk" value={highRisk.toLocaleString()} icon={<AlertTriangle className="w-4 h-4 text-red-500" />} color="text-red-500" border="border-red-500/20" subtitle="Elevation < 19m" />
-            <StatCard title="Moderate Risk" value={modRisk.toLocaleString()} icon={<TrendingUp className="w-4 h-4 text-yellow-500" />} color="text-yellow-600" border="border-yellow-500/20" subtitle="Elevation 19m-21m" />
             <StatCard title="Safety Index" value={`${total > 0 ? ((safe / total) * 100).toFixed(1) : 0}%`} icon={<Activity className="w-4 h-4 text-green-500" />} color="text-green-500" border="border-green-500/20" subtitle="Areas Above 21m" />
+            <StatCard title="Analyzed Area" value={`${stats?.analyzed_area_km2?.toFixed(2) || 0} km²`} icon={<MapIcon className="w-4 h-4 text-purple-500" />} subtitle="Spatial Hull Coverage" />
           </div>
 
           {/* Main Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:grid-cols-1 print:gap-12">
             <div className="lg:col-span-8 xl:col-span-9 h-[450px] sm:h-[600px] lg:h-[700px] print:h-[180mm] map-container">
-              <MapComponent points={points} />
+              <MapComponent points={points} riverPoints={riverPoints} />
             </div>
 
             <aside className="lg:col-span-4 xl:col-span-3 space-y-6 print:lg:col-span-12">
