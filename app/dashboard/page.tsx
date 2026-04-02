@@ -1,4 +1,5 @@
 "use client";
+import { useState, useMemo } from "react";
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
@@ -32,12 +33,77 @@ export default function DashboardPage() {
   const { data: summary = [], isLoading: summaryLoading } = useRiskSummary();
   const { data: riverPoints = [] } = useRiverPoints();
   const { data: stats } = useSpatialStats();
+  const [selectedPoint, setSelectedPoint] = useState<any>(null);
 
-  const getCount = (status: string) => summary.find(s => s.status.includes(status))?.count || 0;
-  const highRisk = getCount("High");
-  const modRisk = getCount("Moderate");
-  const safe = getCount("Safe");
-  const total = highRisk + modRisk + safe;
+  // Area Calculation (Frontend Fallback)
+  const calculatedArea = useMemo(() => {
+    if (!points?.length) return 0;
+    const lats = points.map(p => p.latitude);
+    const lngs = points.map(p => p.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    // at Vijayawada (16.5N), 1deg lat ~111km, 1deg lng ~106km
+    const kmH = (maxLat - minLat) * 111.12;
+    const kmW = (maxLng - minLng) * 106.3;
+    return Math.max(kmH * kmW, 0.05); // min 0.05km for points close together
+  }, [points]);
+
+  // River-Relative Risk Enrichment
+  const enrichedPoints = useMemo(() => {
+    if (!points?.length || !riverPoints?.length) return points;
+    return points.map(pt => {
+      // Find nearest river point
+      let minDist = Infinity;
+      let nearestRiverPt = riverPoints[0];
+      
+      for (const rpt of riverPoints) {
+        const dLat = pt.latitude - rpt.latitude;
+        const dLng = pt.longitude - rpt.longitude;
+        const distSq = dLat * dLat + dLng * dLng;
+        if (distSq < minDist) {
+          minDist = distSq;
+          nearestRiverPt = rpt;
+        }
+      }
+
+      const dx = (pt.longitude - nearestRiverPt.longitude) * 106300;
+      const dy = (pt.latitude - nearestRiverPt.latitude) * 111120;
+      const distanceMeters = Math.sqrt(dx * dx + dy * dy);
+
+      const clearance = pt.elevation_current - nearestRiverPt.elevation_current;
+      
+      // Dynamic Risk Assignment
+      let status = "Safe Zone";
+      if (clearance < 1.0) status = "High Risk (Critical)";
+      else if (clearance < 3.0) status = "Moderate Risk";
+
+      return {
+        ...pt,
+        river_clearance: clearance,
+        nearest_river_elevation: nearestRiverPt.elevation_current,
+        distance_to_river_m: distanceMeters,
+        dynamic_risk_status: status
+      };
+    });
+  }, [points, riverPoints]);
+
+  const riskCounts = useMemo(() => {
+    const counts = { high: 0, moderate: 0, safe: 0 };
+    enrichedPoints.forEach(p => {
+      if (p.dynamic_risk_status?.includes("High")) counts.high++;
+      else if (p.dynamic_risk_status?.includes("Moderate")) counts.moderate++;
+      else counts.safe++;
+    });
+    return counts;
+  }, [enrichedPoints]);
+
+  const total = enrichedPoints.length;
+  const highRisk = riskCounts.high;
+  const modRisk = riskCounts.moderate;
+  const safe = riskCounts.safe;
 
   const handleDownloadReport = () => {
     window.print();
@@ -87,13 +153,13 @@ export default function DashboardPage() {
             <StatCard title="River Nodes" value={(stats?.total_river_points || riverPoints.length).toLocaleString()} icon={<Database className="w-4 h-4 text-sky-500" />} subtitle="Krishna Dataset" />
             <StatCard title="High Risk" value={highRisk.toLocaleString()} icon={<AlertTriangle className="w-4 h-4 text-red-500" />} color="text-red-500" border="border-red-500/20" subtitle="Elevation < 19m" />
             <StatCard title="Safety Index" value={`${total > 0 ? ((safe / total) * 100).toFixed(1) : 0}%`} icon={<Activity className="w-4 h-4 text-green-500" />} color="text-green-500" border="border-green-500/20" subtitle="Areas Above 21m" />
-            <StatCard title="Analyzed Area" value={`${stats?.analyzed_area_km2?.toFixed(2) || 0} km²`} icon={<MapIcon className="w-4 h-4 text-purple-500" />} subtitle="Spatial Hull Coverage" />
+            <StatCard title="Analyzed Area" value={`${calculatedArea.toFixed(2)} km²`} icon={<MapIcon className="w-4 h-4 text-purple-500" />} subtitle="Spatial Hull Coverage" />
           </div>
 
           {/* Main Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:grid-cols-1 print:gap-12">
             <div className="lg:col-span-8 xl:col-span-9 h-[450px] sm:h-[600px] lg:h-[700px] print:h-[180mm] map-container">
-              <MapComponent points={points} riverPoints={riverPoints} />
+              <MapComponent points={enrichedPoints} riverPoints={riverPoints} selectedPoint={selectedPoint} />
             </div>
 
             <aside className="lg:col-span-4 xl:col-span-3 space-y-6 print:lg:col-span-12">
@@ -108,20 +174,31 @@ export default function DashboardPage() {
                       <div key={i} className="h-20 bg-slate-100 dark:bg-white/5 rounded-2xl animate-pulse" />
                     ))
                   ) : points.length > 0 ? (
-                    points.slice(0, 10).map((p, i) => (
-                      <div key={p.id || i} className="p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl hover:border-accent hover:bg-white dark:hover:bg-white/10 transition-all group print:bg-white print:border-slate-200">
+                    enrichedPoints.slice(0, 10).map((p: any, i) => (
+                      <div 
+                        key={p.id || i} 
+                        onClick={() => setSelectedPoint(p)}
+                        className={`p-4 cursor-pointer border border-slate-100 dark:border-white/5 rounded-2xl transition-all group print:bg-white print:border-slate-200 ${
+                          selectedPoint?.id === p.id ? 'bg-white dark:bg-white/10 ring-2 ring-accent shadow-xl border-accent' : 'bg-slate-50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10'
+                        }`}
+                      >
                         <div className="flex justify-between items-start mb-2">
-                          <span className="text-[9px] font-black font-mono text-slate-400 group-hover:text-accent transition-colors">{p.current_index}</span>
-                          <div className={`text-[9px] px-2 py-0.5 rounded-full font-bold border uppercase tracking-tighter ${p.risk_status.includes("High") ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                              p.risk_status.includes("Moderate") ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' :
+                          <div className="flex flex-col">
+                             <span className="text-[10px] font-black text-slate-900 dark:text-white group-hover:text-accent transition-colors">SITE: {p.id?.toString().padStart(4, '0') || i}</span>
+                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                                DIST: {p.distance_to_river_m?.toFixed(0)}m
+                             </span>
+                          </div>
+                          <div className={`text-[9px] px-2 py-0.5 rounded-full font-bold border uppercase tracking-tighter ${p.dynamic_risk_status.includes("High") ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                              p.dynamic_risk_status.includes("Moderate") ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' :
                                 'bg-green-500/10 text-green-600 border-green-500/20'
                             }`}>
-                            {p.risk_status.split(' ')[0]}
+                            {p.dynamic_risk_status.split(' ')[0]}
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400 font-bold uppercase tracking-widest print:text-slate-600">Elevation (Current)</span>
-                          <span className="font-extrabold font-mono text-sm">{p.elevation_current}m</span>
+                        <div className="flex justify-between items-center text-[11px] mt-1">
+                          <span className={`${selectedPoint?.id === p.id ? 'text-slate-900 dark:text-slate-200' : 'text-slate-500'} font-bold uppercase tracking-widest print:text-slate-600`}>Elevation (Current)</span>
+                          <span className={`font-black font-mono text-sm ${selectedPoint?.id === p.id ? 'text-accent' : ''}`}>{p.elevation_current}m</span>
                         </div>
                       </div>
                     ))

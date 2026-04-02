@@ -14,6 +14,11 @@ export interface FloodPoint {
   elevation_delta: number;
   risk_status: string;
   change_analysis: string;
+  // Dynamic Spatial Enrichment Properties
+  river_clearance?: number;
+  nearest_river_elevation?: number;
+  distance_to_river_m?: number;
+  dynamic_risk_status?: string;
 }
 
 interface RiskSummary {

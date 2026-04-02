@@ -15,6 +15,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 interface MapProps {
   points: FloodPoint[];
   riverPoints?: FloodPoint[];
+  selectedPoint?: FloodPoint | null;
 }
 
 /* ================================
@@ -36,10 +37,10 @@ const RADIUS_CONFIG = {
    UTILS
 ================================ */
 
-const getFloodColor = (elevation: number) => {
-  if (elevation < 19) return "#ef4444"; // Red (High)
-  if (elevation <= 21) return "#eab308"; // Yellow (Moderate)
-  return "#22c55e"; // Green (Safe)
+const getFloodColor = (clearance: number) => {
+  if (clearance < 1.0) return "#ef4444"; // Red (High Risk - Critical)
+  if (clearance < 3.0) return "#eab308"; // Yellow (Moderate Risk)
+  return "#22c55e"; // Green (Safe Zone)
 };
 
 // ✅ Smooth linear scaling (stable & predictable)
@@ -97,6 +98,21 @@ function ZoomController({
   return null;
 }
 
+function FocusHandler({ selectedPoint }: { selectedPoint: FloodPoint | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (selectedPoint) {
+      map.flyTo([selectedPoint.latitude, selectedPoint.longitude], 16, {
+        duration: 1.5,
+        easeLinearity: 0.25
+      });
+    }
+  }, [selectedPoint, map]);
+
+  return null;
+}
+
 /* ================================
    🔥 RESPONSIVE MARKER (KEY FIX)
 ================================ */
@@ -106,11 +122,13 @@ function ResponsiveCircleMarker({
   radius,
   color,
   children,
+  isSelected,
 }: {
   center: [number, number];
   radius: number;
   color: string;
   children: React.ReactNode;
+  isSelected?: boolean;
 }) {
   const markerRef = useRef<L.CircleMarker | null>(null);
 
@@ -120,6 +138,13 @@ function ResponsiveCircleMarker({
       markerRef.current.setRadius(radius);
     }
   }, [radius]);
+
+  // 🔥 Auto-open popup when selected
+  useEffect(() => {
+    if (isSelected && markerRef.current) {
+      markerRef.current.openPopup();
+    }
+  }, [isSelected]);
 
   return (
     <CircleMarker
@@ -142,7 +167,7 @@ function ResponsiveCircleMarker({
    MAIN COMPONENT
 ================================ */
 
-export default function MapComponent({ points, riverPoints = [] }: MapProps) {
+export default function MapComponent({ points, riverPoints = [], selectedPoint = null }: MapProps) {
   const [zoom, setZoom] = useState(MAP_CONFIG.ZOOM);
 
   // ✅ Derived value (no need for useState)
@@ -178,16 +203,18 @@ export default function MapComponent({ points, riverPoints = [] }: MapProps) {
         {/* Helpers */}
         <FitBounds points={allPoints} />
         <ZoomController onZoomChange={setZoom} />
+        <FocusHandler selectedPoint={selectedPoint} />
 
         {/* Risk Markers */}
         {points.map((pt, idx) => (
-          <ResponsiveCircleMarker
-            key={`risk-${pt.id || idx}`}
-            center={[pt.latitude, pt.longitude]}
-            radius={radius}
-            color={getFloodColor(pt.elevation_current)}
-          >
-            <Popup>
+            <ResponsiveCircleMarker
+              key={`risk-${pt.id || idx}`}
+              center={[pt.latitude, pt.longitude]}
+              radius={radius}
+              color={getFloodColor((pt as any).river_clearance ?? pt.elevation_current)}
+              isSelected={selectedPoint?.id === pt.id}
+            >
+            <Popup autoPan={false}>
               <div className="text-slate-900 p-1">
                 <p className="font-bold border-b mb-1 pb-1">
                   Site Data
@@ -200,27 +227,55 @@ export default function MapComponent({ points, riverPoints = [] }: MapProps) {
                   </p>
 
                   <p>
+                    Clearance:{" "}
+                    <strong className={(pt as any).river_clearance < 1 ? "text-red-600" : (pt as any).river_clearance < 3 ? "text-yellow-600" : "text-green-600"}>
+                      {Math.abs((pt as any).river_clearance || 0).toFixed(1)}m
+                    </strong>
+                    <span className="text-[8px] text-slate-400 ml-1">
+                      {((pt as any).river_clearance || 0) < 0 ? "(Below River)" : "(Above River)"}
+                    </span>
+                  </p>
+
+                  <p>
+                    Distance to River:{" "}
+                    <strong>
+                      {(pt as any).distance_to_river_m?.toFixed(0) || 0}m
+                    </strong>
+                  </p>
+
+                  <p>
                     Risk:{" "}
                     <span
                       className={
-                        pt.elevation_current < 21
+                        (pt as any).river_clearance < 1
                           ? "text-red-600"
-                          : pt.elevation_current < 23
+                          : (pt as any).river_clearance < 3
                             ? "text-yellow-600"
                             : "text-blue-600"
                       }
                     >
-                      {pt.risk_status}
+                      {(pt as any).dynamic_risk_status || pt.risk_status}
                     </span>
                   </p>
 
-                  <p className="text-[10px] text-slate-400 mt-2">
-                    Baseline index: {pt.baseline_index}
+                  <p className="text-[10px] text-slate-400 mt-2 flex justify-between">
+                    <span>River Ref:</span>
+                    <span>{(pt as any).nearest_river_elevation?.toFixed(1) || 0}m</span>
                   </p>
 
-                  <p className="text-[10px] text-slate-400">
-                    Current index: {pt.current_index}
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-900 pt-1 border-t mt-2">
+                    Index Comparison
                   </p>
+                  <div className="grid grid-cols-2 gap-2 mt-1 py-1">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] text-slate-400 uppercase font-bold">Baseline</span>
+                      <span className="font-bold text-slate-700 text-sm tracking-tight">{pt.baseline_index}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-slate-100 pl-2">
+                      <span className="text-[8px] text-sky-500 uppercase font-bold">Current</span>
+                      <span className="font-black text-sky-600 text-sm tracking-tight">{pt.current_index}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </Popup>
@@ -235,7 +290,7 @@ export default function MapComponent({ points, riverPoints = [] }: MapProps) {
             radius={radius}
             color="#0ea5e9"
           >
-            <Popup>
+            <Popup autoPan={false}>
               <div className="text-slate-900 p-1">
                 <p className="font-bold border-b mb-1 pb-1">
                   Krishna River Point
@@ -258,17 +313,17 @@ export default function MapComponent({ points, riverPoints = [] }: MapProps) {
 
         <div className="flex items-center space-x-2">
           <span className="w-4 h-4 rounded-full bg-red-500"></span>
-          <span>High Risk (&lt;19m)</span>
+          <span>High Risk (&lt;1.0m Clearance)</span>
         </div>
 
         <div className="flex items-center space-x-2">
           <span className="w-4 h-4 rounded-full bg-yellow-500"></span>
-          <span>Moderate Risk (19m-21m)</span>
+          <span>Moderate Risk (1.0m - 3.0m)</span>
         </div>
 
         <div className="flex items-center space-x-2">
           <span className="w-4 h-4 rounded-full bg-green-500"></span>
-          <span>Safe Zone (&gt;21m)</span>
+          <span>Safe Zone (&gt;3.0m)</span>
         </div>
 
         <div className="flex items-center space-x-2 border-t pt-2 mt-2">
