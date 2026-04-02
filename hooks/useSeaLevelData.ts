@@ -88,14 +88,26 @@ export function useRiverPoints() {
   });
 }
 
-export function useSpatialStats() {
-  return useQuery<SpatialStats>({
-    queryKey: ["spatial-stats"],
+export interface TotalCounts {
+  elevation: number;
+  river: number;
+}
+
+export function useTotalCounts() {
+  return useQuery<TotalCounts>({
+    queryKey: ["total-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_spatial_stats");
-      if (error) throw error;
-      return (data as any)[0] as SpatialStats;
+      // Supabase count queries bypass the 1000 row API limit
+      const [elevationRes, riverRes] = await Promise.all([
+        supabase.from("flood_risk_view").select("*", { count: "exact", head: true }),
+        supabase.from("river_data").select("*", { count: "exact", head: true })
+      ]);
+
+      return {
+        elevation: elevationRes.count || 0,
+        river: riverRes.count || 0
+      };
     },
-    staleTime: 1000 * 60 * 2, // Slightly shorter stale time for stats
+    staleTime: 1000 * 60 * 5,
   });
 }

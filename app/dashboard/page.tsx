@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { useFloodPoints, useRiskSummary, useRiverPoints, useSpatialStats } from "@/hooks/useSeaLevelData";
+import { useFloodPoints, useRiskSummary, useRiverPoints, useTotalCounts } from "@/hooks/useSeaLevelData";
 import {
   Activity,
   AlertTriangle,
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const { data: points = [], isLoading: pointsLoading } = useFloodPoints();
   const { data: summary = [], isLoading: summaryLoading } = useRiskSummary();
   const { data: riverPoints = [] } = useRiverPoints();
-  const { data: stats } = useSpatialStats();
+  const { data: dbCounts } = useTotalCounts();
   const [selectedPoint, setSelectedPoint] = useState<any>(null);
 
   // Area Calculation (Frontend Fallback)
@@ -149,10 +149,10 @@ export default function DashboardPage() {
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 print:grid-cols-5">
-            <StatCard title="Points Analyzed" value={(stats?.total_elevation_points || total).toLocaleString()} icon={<Activity className="w-4 h-4 text-blue-500" />} subtitle="Total Ingested Nodes" />
-            <StatCard title="River Nodes" value={(stats?.total_river_points || riverPoints.length).toLocaleString()} icon={<Database className="w-4 h-4 text-sky-500" />} subtitle="Krishna Dataset" />
-            <StatCard title="High Risk" value={highRisk.toLocaleString()} icon={<AlertTriangle className="w-4 h-4 text-red-500" />} color="text-red-500" border="border-red-500/20" subtitle="Elevation < 19m" />
-            <StatCard title="Safety Index" value={`${total > 0 ? ((safe / total) * 100).toFixed(1) : 0}%`} icon={<Activity className="w-4 h-4 text-green-500" />} color="text-green-500" border="border-green-500/20" subtitle="Areas Above 21m" />
+            <StatCard title="Points Analyzed" value={(dbCounts?.elevation || total).toLocaleString()} icon={<Activity className="w-4 h-4 text-blue-500" />} subtitle="Total Ingested Nodes" />
+            <StatCard title="River Nodes" value={(dbCounts?.river || riverPoints.length).toLocaleString()} icon={<Database className="w-4 h-4 text-sky-500" />} subtitle="Krishna Dataset" />
+            <StatCard title="High Risk" value={highRisk.toLocaleString()} icon={<AlertTriangle className="w-4 h-4 text-red-500" />} color="text-red-500" border="border-red-500/20" subtitle="Clearance < 1.0m" />
+            <StatCard title="Safety Index" value={`${total > 0 ? ((safe / total) * 100).toFixed(1) : 0}%`} icon={<Activity className="w-4 h-4 text-green-500" />} color="text-green-500" border="border-green-500/20" subtitle="Clearance > 3.0m" />
             <StatCard title="Analyzed Area" value={`${calculatedArea.toFixed(2)} km²`} icon={<MapIcon className="w-4 h-4 text-purple-500" />} subtitle="Spatial Hull Coverage" />
           </div>
 
