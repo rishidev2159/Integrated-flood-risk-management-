@@ -14,7 +14,7 @@ export interface FloodPoint {
   elevation_delta: number;
   risk_status: string;
   change_analysis: string;
-  // Dynamic Spatial Enrichment Properties
+  // Dynamic Spatial Enrichment Properties (SQL Calculated)
   river_clearance?: number;
   nearest_river_elevation?: number;
   distance_to_river_m?: number;
@@ -60,21 +60,32 @@ export interface SpatialStats {
   analyzed_area_km2: number;
 }
 
+export function useSpatialStats() {
+  return useQuery<SpatialStats>({
+    queryKey: ["spatial-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_spatial_stats");
+      if (error) throw error;
+      return (Array.isArray(data) ? data[0] : data) as SpatialStats;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useRiverPoints() {
   return useQuery<FloodPoint[]>({
     queryKey: ["river-points"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("river_data")
+        .from("river_current")
         .select("*")
         .limit(2000);
       
       if (error) throw error;
-      // Map river data to FloodPoint structure for map compatibility
       return (data || []).map((d: any) => ({
         id: d.id,
-        baseline_index: d.system_index,
-        current_index: d.system_index,
+        baseline_index: d.system_index || "River",
+        current_index: d.system_index || "River",
         latitude: d.latitude,
         longitude: d.longitude,
         elevation_baseline: d.elevation,
@@ -82,7 +93,7 @@ export function useRiverPoints() {
         elevation_delta: 0,
         risk_status: 'River Point',
         change_analysis: 'Stable'
-      })) as FloodPoint[];
+      } as FloodPoint));
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -99,8 +110,8 @@ export function useTotalCounts() {
     queryFn: async () => {
       // Supabase count queries bypass the 1000 row API limit
       const [elevationRes, riverRes] = await Promise.all([
-        supabase.from("flood_risk_view").select("*", { count: "exact", head: true }),
-        supabase.from("river_data").select("*", { count: "exact", head: true })
+        supabase.from("land_data").select("*", { count: "exact", head: true }),
+        supabase.from("river_current").select("*", { count: "exact", head: true })
       ]);
 
       return {

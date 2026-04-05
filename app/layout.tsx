@@ -5,8 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import QueryProvider from "@/components/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "Integrated Flood Risk Management - VIIT research",
-  description: "A SQL and GIS based approach for urban flood risk assessment in Vijayawada.",
+  title: "Integrated Flood Risk Management: A SQL and GIS Based Approach",
+  description: "Advanced urban flood risk assessment and spatial analysis for Vijayawada.",
 };
 
 export default function RootLayout({

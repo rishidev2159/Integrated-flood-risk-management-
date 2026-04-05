@@ -53,9 +53,20 @@ export default function DashboardPage() {
 
   // River-Relative Risk Enrichment
   const enrichedPoints = useMemo(() => {
-    if (!points?.length || !riverPoints?.length) return points;
+    if (!points?.length) return [];
+    
     return points.map(pt => {
-      // Find nearest river point
+      // 🚀 Use SQL-calculated spatial attributes if present (High Performance)
+      if (pt.river_clearance !== undefined) {
+        return {
+          ...pt,
+          dynamic_risk_status: pt.risk_status
+        };
+      }
+
+      // 🔄 Fallback: Frontend spatial logic (if view hasn't updated yet)
+      if (!riverPoints?.length) return pt;
+      
       let minDist = Infinity;
       let nearestRiverPt = riverPoints[0];
       
@@ -72,10 +83,8 @@ export default function DashboardPage() {
       const dx = (pt.longitude - nearestRiverPt.longitude) * 106300;
       const dy = (pt.latitude - nearestRiverPt.latitude) * 111120;
       const distanceMeters = Math.sqrt(dx * dx + dy * dy);
-
-      const clearance = pt.elevation_current - nearestRiverPt.elevation_current;
+      const clearance = pt.elevation_baseline - nearestRiverPt.elevation_current;
       
-      // Dynamic Risk Assignment
       let status = "Safe Zone";
       if (clearance < 1.0) status = "High Risk (Critical)";
       else if (clearance < 3.0) status = "Moderate Risk";
@@ -114,8 +123,9 @@ export default function DashboardPage() {
       <div className="max-w-[1800px] 2xl:max-w-[1920px] mx-auto relative z-10 space-y-8 sm:space-y-12 2xl:space-y-16 print:space-y-6">
 
         {/* Print-Only Academic Header */}
-        <div className="hidden print:block border-b-2 border-slate-200 pb-6 mb-8">
-          <h1 className="text-3xl font-black tracking-tight mb-2">Integrated Flood Risk Management Framework</h1>
+        <div className="hidden print:block border-b-2 border-slate-200 pb-6 mb-8 text-center">
+          <h1 className="text-3xl font-black tracking-tight mb-2 uppercase">Integrated Flood Risk Management</h1>
+          <p className="text-xl font-bold text-slate-600 mb-4 tracking-wide italic">A SQL and GIS Based Approach</p>
           <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest text-slate-500">
             <span>Flood Risk Intelligence System</span>
             <span>Research Analysis Report</span>
@@ -128,10 +138,13 @@ export default function DashboardPage() {
             <Link href="/" className="inline-flex items-center text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-accent transition-colors">
               <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Ingestion
             </Link>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-none">
-              Flood Risk <span className="text-accent underline decoration-accent/30 decoration-4 underline-offset-8">Intelligence</span>
-            </h1>
-            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest pt-2">PostGIS Spatial Analysis Dashboard · VIIT Research</p>
+            <div className="space-y-1">
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tighter leading-none">
+                Integrated Flood Risk <span className="text-accent underline decoration-accent/30 decoration-4 underline-offset-8 font-serif italic text-4xl sm:text-5xl ml-1">Management</span>
+              </h1>
+              <p className="text-lg font-bold text-slate-500 tracking-tight pl-1">A SQL and GIS Based Approach</p>
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest pt-2">Spatial Intelligence Dashboard · Vijayawada, AP</p>
           </div>
           <div className="flex items-center gap-3 sm:gap-4 self-start md:self-auto">
             <ThemeToggle />

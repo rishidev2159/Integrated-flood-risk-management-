@@ -9,45 +9,45 @@ import Papa from "papaparse";
 import { supabase } from "@/lib/supabase";
 
 export default function FileUploader() {
-  const [files, setFiles] = useState<{ year1: File | null; year2: File | null; river: File | null }>({
-    year1: null,
-    year2: null,
-    river: null,
+  const [files, setFiles] = useState<{ land: File | null; riverBaseline: File | null; riverCurrent: File | null }>({
+    land: null,
+    riverBaseline: null,
+    riverCurrent: null,
   });
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const onDropYear1 = (acceptedFiles: File[]) => {
-    setFiles((prev) => ({ ...prev, year1: acceptedFiles[0] }));
+  const onDropLand = (acceptedFiles: File[]) => {
+    setFiles((prev) => ({ ...prev, land: acceptedFiles[0] }));
     setError(null);
   };
 
-  const onDropYear2 = (acceptedFiles: File[]) => {
-    setFiles((prev) => ({ ...prev, year2: acceptedFiles[0] }));
+  const onDropRiverBaseline = (acceptedFiles: File[]) => {
+    setFiles((prev) => ({ ...prev, riverBaseline: acceptedFiles[0] }));
     setError(null);
   };
 
-  const onDropRiver = (acceptedFiles: File[]) => {
-    setFiles((prev) => ({ ...prev, river: acceptedFiles[0] }));
+  const onDropRiverCurrent = (acceptedFiles: File[]) => {
+    setFiles((prev) => ({ ...prev, riverCurrent: acceptedFiles[0] }));
     setError(null);
   };
 
   const { getRootProps: getRoot1, getInputProps: getInput1 } = useDropzone({
-    onDrop: onDropYear1,
+    onDrop: onDropLand,
     accept: { "text/csv": [".csv"] },
     multiple: false,
   });
 
   const { getRootProps: getRoot2, getInputProps: getInput2 } = useDropzone({
-    onDrop: onDropYear2,
+    onDrop: onDropRiverBaseline,
     accept: { "text/csv": [".csv"] },
     multiple: false,
   });
 
   const { getRootProps: getRoot3, getInputProps: getInput3 } = useDropzone({
-    onDrop: onDropRiver,
+    onDrop: onDropRiverCurrent,
     accept: { "text/csv": [".csv"] },
     multiple: false,
   });
@@ -73,57 +73,64 @@ export default function FileUploader() {
   };
 
   const handleIngest = async () => {
-    if (!files.year1 || !files.year2) {
-      setError("Please provide both Source A (Baseline) and Source B (Satellite) CSVs.");
+    if (!files.land || !files.riverBaseline || !files.riverCurrent) {
+      setError("Please provide all 3 CSVs: Land Elevation, River Baseline, and River Current.");
       return;
     }
 
     setUploading(true);
-    setProgress(10);
+    setProgress(5);
     setError(null);
 
     try {
       // 1. Clear massive datasets via high-performance RPC
       const { error: clearError } = await supabase.rpc('clear_elevation_data');
-      if (clearError) throw clearError;
-
-      const dataA = mapData(await parseCSV(files.year1));
-      setProgress(20);
+      if (clearError) throw new Error(`Clearing failed: ${clearError.message}`);
       
-      for (let i = 0 ; i < dataA.length; i += 1000) {
-        const batch = dataA.slice(i, i + 1000);
-        const { error: err } = await supabase.from('elevation_primary').insert(batch);
-        if (err) throw err;
-        setProgress(20 + Math.floor((i / dataA.length) * 20));
-      }
+      setProgress(10);
 
-      const dataB = mapData(await parseCSV(files.year2));
+      // 2. Process Land Data
+      const dataLand = mapData(await parseCSV(files.land));
+      if (dataLand.length === 0) throw new Error("Land Elevation CSV is empty or invalid.");
+      
+      for (let i = 0 ; i < dataLand.length; i += 1000) {
+        const batch = dataLand.slice(i, i + 1000);
+        const { error: err } = await supabase.from('land_data').insert(batch);
+        if (err) throw err;
+        setProgress(10 + Math.floor((i / dataLand.length) * 30));
+      }
       setProgress(40);
 
-      for (let i = 0 ; i < dataB.length; i += 1000) {
-        const batch = dataB.slice(i, i + 1000);
-        const { error: err } = await supabase.from('elevation_secondary').insert(batch);
-        if (err) throw err;
-        setProgress(40 + Math.floor((i / dataB.length) * 30));
-      }
+      // 3. Process River Baseline
+      const dataRB = mapData(await parseCSV(files.riverBaseline));
+      if (dataRB.length === 0) throw new Error("River Baseline CSV is empty or invalid.");
 
-      if (files.river) {
-        const dataR = mapData(await parseCSV(files.river));
-        setProgress(70);
-        for (let i = 0 ; i < dataR.length; i += 1000) {
-          const batch = dataR.slice(i, i + 1000);
-          const { error: err } = await supabase.from('river_data').insert(batch);
-          if (err) throw err;
-          setProgress(70 + Math.floor((i / dataR.length) * 25));
-        }
+      for (let i = 0 ; i < dataRB.length; i += 1000) {
+        const batch = dataRB.slice(i, i + 1000);
+        const { error: err } = await supabase.from('river_baseline').insert(batch);
+        if (err) throw err;
+        setProgress(40 + Math.floor((i / dataRB.length) * 30));
+      }
+      setProgress(70);
+
+      // 4. Process River Current
+      const dataRC = mapData(await parseCSV(files.riverCurrent));
+      if (dataRC.length === 0) throw new Error("River Current CSV is empty or invalid.");
+
+      for (let i = 0 ; i < dataRC.length; i += 1000) {
+        const batch = dataRC.slice(i, i + 1000);
+        const { error: err } = await supabase.from('river_current').insert(batch);
+        if (err) throw err;
+        setProgress(70 + Math.floor((i / dataRC.length) * 30));
       }
 
       setProgress(100);
-      setTimeout(() => router.push("/dashboard"), 500);
+      setTimeout(() => router.push("/dashboard"), 800);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Data ingestion failed. Check CSV format.");
+      console.error("Ingestion Error:", err);
+      setError(err.message || "Data ingestion failed. Check CSV format and network.");
       setUploading(false);
+      setProgress(0);
     }
   };
 
@@ -133,23 +140,23 @@ export default function FileUploader() {
         <DropzoneBox 
           getRootProps={getRoot1} 
           getInputProps={getInput1} 
-          file={files.year1} 
-          label="Source A: Baseline" 
-          sub="Historical Data" 
+          file={files.land} 
+          label="Source A: Land" 
+          sub="Base Topography" 
         />
         <DropzoneBox 
           getRootProps={getRoot2} 
           getInputProps={getInput2} 
-          file={files.year2} 
-          label="Source B: Satellite" 
-          sub="Current Data" 
+          file={files.riverBaseline} 
+          label="Source B: River (B)" 
+          sub="Historical Stage" 
         />
         <DropzoneBox 
           getRootProps={getRoot3} 
           getInputProps={getInput3} 
-          file={files.river} 
-          label="Source C: River" 
-          sub="Krishna Dataset" 
+          file={files.riverCurrent} 
+          label="Source C: River (C)" 
+          sub="Satellite/Current" 
         />
       </div>
 
@@ -170,7 +177,7 @@ export default function FileUploader() {
               key="btn"
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               onClick={handleIngest}
-              disabled={!files.year1 || !files.year2 || !files.river}
+              disabled={!files.land || !files.riverBaseline || !files.riverCurrent}
               className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-slate-900 dark:bg-accent text-white dark:text-black font-black rounded-2xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg dark:shadow-[0_0_25px_rgba(94,241,255,0.3)] disabled:opacity-50 disabled:grayscale uppercase tracking-widest text-xs"
             >
               <Database className="w-4 h-4 mr-3" />

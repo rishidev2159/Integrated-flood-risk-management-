@@ -208,10 +208,10 @@ export default function MapComponent({ points, riverPoints = [], selectedPoint =
         {/* Risk Markers */}
         {points.map((pt, idx) => (
             <ResponsiveCircleMarker
-              key={`risk-${pt.id || idx}`}
+              key={`risk-${pt.id || idx}-${zoom}`}
               center={[pt.latitude, pt.longitude]}
               radius={radius}
-              color={getFloodColor((pt as any).river_clearance ?? pt.elevation_current)}
+              color={getFloodColor(pt.river_clearance ?? 0)}
               isSelected={selectedPoint?.id === pt.id}
             >
             <Popup autoPan={false}>
@@ -223,23 +223,23 @@ export default function MapComponent({ points, riverPoints = [], selectedPoint =
                 <div className="text-xs space-y-1">
                   <p>
                     Elevation:{" "}
-                    <strong>{pt.elevation_current}m</strong>
+                    <strong>{pt.elevation_baseline}m</strong>
                   </p>
 
                   <p>
                     Clearance:{" "}
-                    <strong className={(pt as any).river_clearance < 1 ? "text-red-600" : (pt as any).river_clearance < 3 ? "text-yellow-600" : "text-green-600"}>
-                      {Math.abs((pt as any).river_clearance || 0).toFixed(1)}m
+                    <strong className={(pt.river_clearance ?? 0) < 1 ? "text-red-600" : (pt.river_clearance ?? 0) < 3 ? "text-yellow-600" : "text-green-600"}>
+                      {Math.abs(pt.river_clearance || 0).toFixed(1)}m
                     </strong>
                     <span className="text-[8px] text-slate-400 ml-1">
-                      {((pt as any).river_clearance || 0) < 0 ? "(Below River)" : "(Above River)"}
+                      {(pt.river_clearance || 0) < 0 ? "(Below River)" : "(Above River)"}
                     </span>
                   </p>
 
                   <p>
                     Distance to River:{" "}
                     <strong>
-                      {(pt as any).distance_to_river_m?.toFixed(0) || 0}m
+                      {pt.distance_to_river_m?.toFixed(0) || 0}m
                     </strong>
                   </p>
 
@@ -247,20 +247,20 @@ export default function MapComponent({ points, riverPoints = [], selectedPoint =
                     Risk:{" "}
                     <span
                       className={
-                        (pt as any).river_clearance < 1
+                        (pt.river_clearance ?? 0) < 1
                           ? "text-red-600"
-                          : (pt as any).river_clearance < 3
+                          : (pt.river_clearance ?? 0) < 3
                             ? "text-yellow-600"
                             : "text-blue-600"
                       }
                     >
-                      {(pt as any).dynamic_risk_status || pt.risk_status}
+                      {pt.dynamic_risk_status || pt.risk_status}
                     </span>
                   </p>
 
                   <p className="text-[10px] text-slate-400 mt-2 flex justify-between">
                     <span>River Ref:</span>
-                    <span>{(pt as any).nearest_river_elevation?.toFixed(1) || 0}m</span>
+                    <span>{pt.nearest_river_elevation?.toFixed(1) || 0}m</span>
                   </p>
 
                   <p className="text-[11px] font-black uppercase tracking-widest text-slate-900 pt-1 border-t mt-2">
