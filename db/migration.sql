@@ -32,34 +32,36 @@ SELECT
     l.latitude,
     l.longitude,
     l.elevation as elevation_baseline, -- This is the land elevation
-    rc.elevation as elevation_current, -- This is the nearest river elevation
-    (l.elevation - rc.elevation) as river_clearance,
-    (rb.elevation - rc.elevation) as elevation_delta, -- Change in river level (impact on risk)
-    ST_Distance(l.geom::geography, rc.geom::geography) as distance_to_river_m,
+    COALESCE(rc.elevation, l.elevation) as elevation_current, -- This is the nearest river elevation
+    (l.elevation - COALESCE(rc.elevation, l.elevation)) as river_clearance,
+    (COALESCE(rb.elevation, rc.elevation, l.elevation) - COALESCE(rc.elevation, l.elevation)) as elevation_delta, -- Change in river level (impact on risk)
+    COALESCE(ST_Distance(l.geom::geography, rc.geom::geography), 0.0) as distance_to_river_m,
     CASE 
+        WHEN rc.id IS NULL THEN 'No Data'
         WHEN (l.elevation - rc.elevation) < 1.0 THEN 'High Risk (Red)'
         WHEN (l.elevation - rc.elevation) >= 1.0 AND (l.elevation - rc.elevation) <= 3.0 THEN 'Moderate Risk (Yellow)'
         ELSE 'Safe Zone (Green)'
     END as risk_status,
     CASE 
+        WHEN rb.id IS NULL OR rc.id IS NULL THEN 'Stable'
         WHEN (rb.elevation - rc.elevation) > 0.5 THEN 'Worsened'
         WHEN (rb.elevation - rc.elevation) < -0.5 THEN 'Improved'
         ELSE 'Stable'
     END as change_analysis,
     l.geom
 FROM land_data l
-CROSS JOIN LATERAL (
-    SELECT elevation, geom
+LEFT JOIN LATERAL (
+    SELECT id, elevation, geom
     FROM river_current
     ORDER BY l.geom <-> geom
     LIMIT 1
-) rc
-CROSS JOIN LATERAL (
-    SELECT elevation
+) rc ON TRUE
+LEFT JOIN LATERAL (
+    SELECT id, elevation
     FROM river_baseline
     ORDER BY l.geom <-> geom
     LIMIT 1
-) rb;
+) rb ON TRUE;
 
 -- 4. Update RPC Functions
 CREATE OR REPLACE FUNCTION clear_elevation_data()
