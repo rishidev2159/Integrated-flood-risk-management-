@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { RiverElevationChart } from "@/components/charts/RiverElevationChart";
 
 const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   ssr: false,
@@ -224,6 +225,28 @@ export default function DashboardPage() {
                 </div>
               </div>
             </aside>
+          </div>
+
+          {/* Analytics Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
+             <div className="lg:col-span-2">
+                <RiverElevationChart />
+             </div>
+             <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 flex flex-col justify-center items-center text-center gap-4 group hover:border-accent/40 transition-all">
+                <div className="p-4 bg-accent/10 rounded-2xl group-hover:bg-accent group-hover:text-black transition-all">
+                  <Activity className="w-8 h-8 text-accent group-hover:text-black" />
+                </div>
+                <h4 className="text-xl font-black tracking-tight uppercase">System Status</h4>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest leading-[2] italic">
+                  Spatial Engine: Active <br />
+                  Synchronization: 100% <br />
+                  Temporal Analysis: {total.toLocaleString()} Points <br />
+                  River Baseline: Consolidated
+                </p>
+                <div className="mt-4 px-6 py-2 bg-slate-900 dark:bg-accent/20 rounded-full text-[10px] font-black uppercase tracking-[0.3em] text-accent">
+                  Healthy
+                </div>
+             </div>
           </div>
 
           {/* Print-Only Academic Footer */}

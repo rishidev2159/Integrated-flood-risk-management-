@@ -122,3 +122,21 @@ export function useTotalCounts() {
     staleTime: 1000 * 60 * 5,
   });
 }
+
+export interface RiverComparison {
+  name: string;
+  baseline: number;
+  current: number;
+}
+
+export function useRiverComparison() {
+  return useQuery<RiverComparison[]>({
+    queryKey: ["river-comparison"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_river_comparison");
+      if (error) throw error;
+      return data as RiverComparison[];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}

@@ -151,3 +151,27 @@ GRANT EXECUTE ON FUNCTION clear_elevation_data() TO service_role;
 GRANT EXECUTE ON FUNCTION get_spatial_stats() TO anon;
 GRANT EXECUTE ON FUNCTION get_spatial_stats() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_spatial_stats() TO service_role;
+
+-- 10. River Comparison RPC for Analytics
+CREATE OR REPLACE FUNCTION get_river_comparison()
+RETURNS TABLE (
+    name TEXT,
+    baseline DOUBLE PRECISION,
+    current DOUBLE PRECISION
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COALESCE(rc.system_index, 'Point ' || rc.id) as name,
+        rb.elevation as baseline,
+        rc.elevation as current
+    FROM river_current rc
+    JOIN river_baseline rb ON rc.system_index = rb.system_index
+    ORDER BY rc.id ASC
+    LIMIT 15;
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION get_river_comparison() TO anon;
+GRANT EXECUTE ON FUNCTION get_river_comparison() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_river_comparison() TO service_role;
